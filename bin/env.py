@@ -24,7 +24,7 @@ FILE_VIEW_COLUMN_CONFIG = (
     ("time", 100),
     ("name", 100),
 )
-FILE_VIEW_COLUMN_TYPE_CONFIG = (str, int, int, int, int, str, str, str)
+FILE_VIEW_COLUMN_TYPE_CONFIG = (str, str, str, str, str, str, str, str)
 
 # Resp bar Settings :
 RESP_BAR_WELCOME_INFO = "Welcome to use rp-ftp-client ..."

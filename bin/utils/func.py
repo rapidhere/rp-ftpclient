@@ -19,7 +19,7 @@ def filenode_new_from_line(str_line):
     fn.set_owner(buf[2])
     fn.set_group(buf[3])
     fn.set_size(buf[4])
-    fn.set_date(buf[5] + " " + buf[6])
+    fn.set_size(buf[5] + buf[6])
     fn.set_time(buf[7])
     fn.set_name(buf[8])
 

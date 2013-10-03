@@ -7,7 +7,7 @@ from bin import env
 
 
 class FileNode:
-    def __init__(self, mode="", nind=0, owner=0, group=0, size=0, date="", time="", name=""):
+    def __init__(self, mode="", nind="", owner="", group="", size="", date="", time="", name=""):
         self.set_mode(mode)
         self.set_nind(nind)
         self.set_owner(owner)

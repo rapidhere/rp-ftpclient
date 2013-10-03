@@ -8,10 +8,15 @@ import gtk
 from bin.ui import Window, MenuBar, FileView, ResponseBar
 from bin.ui.dialogs import BaseConnectDialog, BASE_CONNECT_DIA_BT_CONNECT, BASE_CONNECT_DIA_BT_CANCEL
 from bin import env
+from bin.net import FTP
+from bin.utils import filenode_new_from_line
+from bin import exp
 
 
 class RFApp:
     def __init__(self):
+        self.ftp = FTP()
+
         self.win = Window(self)
         self._load_up_menubar()
         self._load_up_file_list_view()
@@ -45,7 +50,9 @@ class RFApp:
                 ["_base connect", self._on_menubar_base_connect],
                 ["_advanced connect", self._on_menubar_advanced_connect],
                 None,
-                ["_history", self._on_menubar_history]
+                ["_history", self._on_menubar_history],
+                None,
+                ["_disconnect", self._on_menubar_disconnect]
             ),
             (
                 "_options",
@@ -76,10 +83,7 @@ class RFApp:
         resp = dia.run()
 
         if resp.resp_id == BASE_CONNECT_DIA_BT_CONNECT:
-            print resp.resp_id
-            print resp.hst
-            print resp.usr
-            print resp.pss
+            self.resp_bar.append_line("Connecting ...")
         elif resp.resp_id == BASE_CONNECT_DIA_BT_CANCEL:
             pass
 
@@ -87,6 +91,9 @@ class RFApp:
         pass
 
     def _on_menubar_history(self, widget, data=None):
+        pass
+
+    def _on_menubar_disconnect(self, widget, data=None):
         pass
 
     def _on_menubar_general_options(self, widget, data=None):

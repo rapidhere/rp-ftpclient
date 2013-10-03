@@ -21,6 +21,7 @@ DIALOG_CONFIG = (
 class BaseConnectDialog(InputDialog):
     def __init__(self, parent):
         InputDialog.__init__(self, parent)
+        self.set_title("Basement Connection")
 
         # Build up ui
         self.tbl_box = gtk.Table(len(DIALOG_CONFIG), 2)
