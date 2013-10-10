@@ -8,7 +8,7 @@ import gtk
 from bin import env
 from bin.utils.decs import scrollable_widget
 from bin.widget import get_directory_tree
-from bin.widget.directory_tree import tree_dir_string_to_path
+from bin.widget import tree_dir_string_to_path
 
 
 @scrollable_widget

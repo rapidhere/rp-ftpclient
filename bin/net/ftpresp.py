@@ -2,12 +2,6 @@
 #-*- coding:utf-8 -*-
 
 
-def ftp_response_new_from_string(string):
-    if not string:
-        return FTPResponse(-1, "None")
-    return FTPResponse(string[:3], string[4:])
-
-
 class FTPResponse:
     def __init__(self, resp_code=0, resp_text=""):
         self.set_resp_code(resp_code)
@@ -27,10 +21,6 @@ class FTPResponse:
 
     def __repr__(self):
         return "%d %s" % (self.get_resp_code(), self.get_resp_text())
-
-    def is_bad_response(self):
-        top_bit = str(self.get_resp_code())[0]
-        return top_bit == "4" or top_bit == "5"
 
     def get_pair(self):
         return self.get_resp_code(), self.get_resp_text()

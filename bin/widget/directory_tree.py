@@ -5,36 +5,16 @@ import pygtk
 pygtk.require("2.0")
 import gobject
 
-from filenode import FileNode
-
-
-def tree_dir_path_to_string(path_tuple):
-    return "\n".join([repr(x) for x in path_tuple])
-
-
-def tree_dir_string_to_path(string):
-    return string.split("\n")
+from utils import tree_dir_path_to_string
+from decs import std_path_notify_function
+from directory_tree_node import DirectoryTreeNode
 
 
 class DirectoryTree(gobject.GObject):
-    def std_path_notify_function(emit_signal):
-        def _dec_func(func):
-            def _func(self, *args, **kwargs):
-                path = kwargs.get("path",None)
-                if path:
-                    node = self.get_node(path)
-                else:
-                    node = self.cur_node
-                ret_node = func(self, node, *args, **kwargs)
-
-                self.emit(emit_signal, tree_dir_path_to_string(ret_node.get_path_tuple()))
-
-            return _func
-        return _dec_func
-
     def __init__(self):
         gobject.GObject.__init__(self)
         self._root = DirectoryTreeNode()
+        self._root.set_expanded()
 
     def set_cur_node(self, node):
         self.cur_node = node
@@ -54,6 +34,9 @@ class DirectoryTree(gobject.GObject):
                 self._root.get_nth_child(0).get_path_tuple()
             ))
         self.emit("rf-directory-tree-add-node", tree_dir_path_to_string(root.get_path_tuple()))
+
+    def get_root(self):
+        return self._root.get_nth_child(0)
 
     def get_node(self, path):
         ret = self._root
@@ -151,92 +134,3 @@ gobject.signal_new(
     gobject.TYPE_NONE,
     (gobject.TYPE_STRING,)
 )
-
-
-class DirectoryTreeNode(gobject.GObject):
-    def __init__(self, fn=None, parent=None):
-        gobject.GObject.__init__(self)
-
-        if not fn:
-            self.filenode = FileNode()
-        else:
-            self.filenode = fn
-
-        self.parent = parent
-        self.child_list = []
-
-    def get_path_tuple(self):
-        ret = []
-        iter = self
-        while iter.get_parent():
-            ret = [iter.get_parent().child_list.index(iter)] + ret
-            iter = iter.get_parent()
-
-        return ret
-
-    def get_dir_tuple(self):
-        ret = []
-        iter = self
-        while iter.get_parent():
-            ret = [iter.filenode.get_name()] + ret
-            iter = iter.get_parent()
-
-        return ret
-
-    def set_filenode(self, fn):
-        self.filenode = fn
-
-    def get_filenode(self):
-        return self.filenode
-
-    def get_nth_child(self, index):
-        return self.child_list[int(index)]
-
-    def get_n_children(self):
-        return len(self.child_list)
-
-    def get_parent(self):
-        return self.parent
-
-    def append_child(self, ch):
-        self.child_list.append(ch)
-        return ch
-
-    def append_child_fn(self, fn):
-        ch = DirectoryTreeNode(fn, parent=self)
-        return self.append_child(ch)
-
-    def prepend_child(self, ch):
-        self.child_list = [ch] + self.child_list
-        return ch
-
-    def prepend_child_fn(self, fn):
-        ch = DirectoryTreeNode(fn, parent=self)
-        return self.prepend_child(ch)
-
-    def insert_child(self, index, ch):
-        self.child_list.insert(index, ch)
-        return ch
-
-    def insert_child_fn(self, index, fn):
-        ch = DirectoryTreeNode(fn, parent=self)
-        return self.insert_child(index, ch)
-
-    def remove_child(self, index):
-        return self.child_list.pop(index)
-
-    def change_child(self, index, new_ch):
-        self.child_list[index] = new_ch
-        return new_ch
-
-    def change_child_fn(self, index, fn):
-        ch = DirectoryTreeNode(fn, parent=self)
-        return self.change_child(index, fn)
-
-    def index_child(self, node):
-        index = 0
-        for nd in self.child_list:
-            if nd.get_filenode().get_name() == node.get_filenode().get_name():
-                return index
-
-        return -1

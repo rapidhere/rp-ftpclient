@@ -10,66 +10,24 @@ pygtk.require("2.0")
 import gobject
 import socket
 from ftplib import CRLF
-
-# Constants
-FTP_DATA_TYPE_ASCII = 'A'
-#FTP_DATA_TYPE_EBCDIC = 'E'
-FTP_DATA_TYPE_IMAGE = 'I'
-#FTP_DATA_TYPE_LOCAL = 'L'
-
-FTP_DATA_STRUCTURE_FILE = 'F'
-#FTP_DATA_STRUCTURE_RECORD = 'R'
-#FTP_DATA_STRUCTURE_PAGE = 'P'
-
-FTP_DATA_TRANSMISSION_MODE_STREAM = 'S'
-FTP_DATA_TRANSMISSION_MODE_BLOCK = 'B'
-FTP_DATA_TRANSMISSION_MODE_COMPRESSED = 'C'
-
-FTP_CONNECT_MODE_PASSIVE = "PASS"
-FTP_CONNECT_MODE_POSITIVE = "PORT"
-
-# Default:
-FTP_DEFAULT_CONNECT_MODE = FTP_CONNECT_MODE_PASSIVE
-FTP_DEFAULT_CONNECT_TIMEOUT = 60
+from constants import *
+import decs
 
 
 class FTP(gobject.GObject):
-    # Decorators: {
-    def _require_data_connection_function(func):
-        def _func(self, *args, **kwargs):
-            md = self.get_transfer_mode()
-            if md == FTP_CONNECT_MODE_PASSIVE:
-                self.make_pasv()
-            elif md == FTP_CONNECT_MODE_POSITIVE:
-                self.make_port()
-            ret = func(self, *args, **kwargs)
-            self._data_conn.close()
-            self._data_file.close()
-            return ret
-
-        return _func
-
-    def _response_function(func):
-        def _func(self, *args, **kwargs):
-            func(self, *args, **kwargs)
-            return self._process_response()
-
-        return _func
-    # }
-
     def __init__(self):
         gobject.GObject.__init__(self)
         self._data_conn = None
         self._sock = self._sock_file = None
         self.set_transfer_mode(FTP_DEFAULT_CONNECT_MODE)
 
-    @_response_function
+    @decs._response_function
     def connect_to_host(self, host, port=21, timeout=FTP_DEFAULT_CONNECT_TIMEOUT):
         # Connect to specified host, port
         self._sock = socket.create_connection((host, port), timeout)
         self._sock_file = self._sock.makefile("rb")
 
-    @_response_function
+    @decs._response_function
     def send_cmd(self, cmd, cmd_pars=None):
         if cmd_pars:
             if type(cmd_pars) == str:
@@ -156,7 +114,7 @@ class FTP(gobject.GObject):
         self._data_file = sock.makefile("rb")
         return host, port
 
-    @_require_data_connection_function
+    @decs._require_data_connection_function
     def list_current_dir(self):
         self.send_cmd("LIST")
         buf = self._get_all_line(self._data_file)
@@ -167,7 +125,7 @@ class FTP(gobject.GObject):
         resp = self.send_cmd("PWD")
         return resp.get_resp_text()[1:-1]
 
-    @_require_data_connection_function
+    @decs._require_data_connection_function
     def list_dir(self, dir):
         self.send_cmd("LIST", dir)
         buf = self._get_all_line(self._data_file)

@@ -10,8 +10,7 @@ from bin.ui import Window, MenuBar, FileView, ResponseView, DirectoryView
 from bin.ui.dialogs import BaseConnectDialog, BASE_CONNECT_DIA_BT_CONNECT, BASE_CONNECT_DIA_BT_CANCEL
 from bin import env
 from bin.net import FTP, FTPResponse
-from bin.utils import filenode_new_from_line
-from bin.widget import FileNode, get_directory_tree
+from bin.widget import FileNode, get_directory_tree, filenode_new_from_line, tree_dir_string_to_path, FILE_TYPE_DIR
 
 
 class RFApp(gobject.GObject):
@@ -33,6 +32,7 @@ class RFApp(gobject.GObject):
         self.win.connect("destroy", lambda w: self.exit())
         self.ftp.connect("rf-ftp-response", self._on_ftp_response)
         self.ftp.connect("rf-ftp-send-cmd", self._on_ftp_send_cmd)
+        self.directory_view._inner.connect("rf-dir-view-expand-node", self._on_directory_view_expand_node)
 
         self.win.show()
 
@@ -134,9 +134,10 @@ class RFApp(gobject.GObject):
         self.resp_bar.append_info_line("Retrieving directory ..")
 
         root_dir = self.ftp.print_current_dir()
-        root_fn = FileNode(name=root_dir)
+        root_fn = FileNode(name=root_dir, type=FILE_TYPE_DIR)
         self.dir_tree.set_root(root_fn)
 
+        self.dir_tree.get_cur_node().set_expanded()
         for line in self.ftp.list_current_dir().split("\n"):
             if not line:
                 continue
@@ -164,6 +165,24 @@ class RFApp(gobject.GObject):
 
     def _on_ftp_send_cmd(self, widget, cmd):
         self.resp_bar.append_send_cmd_info(cmd)
+
+    def _on_directory_view_expand_node(self, widget, path):
+        path = tree_dir_string_to_path(path)
+        node = self.dir_tree.get_node(path)
+
+        print "#" + str(path)
+        print "#" + str(node.get_filenode().get_name())
+        print "#"
+
+        dir_tuple = node.get_dir_tuple()
+        node.set_expanded()
+        for line in self.ftp.list_dir("/".join(dir_tuple)).split("\n"):
+            if not line:
+                continue
+            fn = filenode_new_from_line(line)
+            self.dir_tree.append_child_fn(fn, node=node)
+
+        return True
 
     def _on_menubar_advanced_connect(self, widget, data=None):
         pass
