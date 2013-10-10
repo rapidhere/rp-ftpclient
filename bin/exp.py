@@ -18,6 +18,7 @@ class FTPMakePortFailed(FTPException):
     def __init__(self):
         FTPException.__init__(self, "Failed to find a usable port for PORT command")
 
+
 class FTPRuntimeException(FTPException):
     def __init__(self, resp):
         resp_id = resp.get_resp_code()

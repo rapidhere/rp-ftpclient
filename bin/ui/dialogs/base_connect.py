@@ -12,7 +12,9 @@ BASE_CONNECT_DIA_BT_CANCEL = 2
 
 
 DIALOG_CONFIG = (
+    #Label  var_name visible
     ("Host", "hst", True),
+    ("Port", "prt", True),
     ("Username", "usr", True),
     ("Password", "pss", False)
 )

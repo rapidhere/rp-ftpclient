@@ -1,35 +1,61 @@
 #!/usr/bin/python
 #-*- coding:utf-8 -*-
+import pygtk
+pygtk.require("2.0")
+import gtk
 
-FILE_NODE_ATTR_LIST = ("mode", "nind", "owner", "group", "size", "date", "time", "name")
+FILE_NODE_ATTR_LIST = ("type", "name", "size", "date", "time")
 
-from bin import env
+FILE_TYPE_LINK = 0
+FILE_TYPE_FILE = 1
+FILE_TYPE_DIR = 2
 
 
 class FileNode:
-    def __init__(self, mode="", nind="", owner="", group="", size="", date="", time="", name=""):
-        self.set_mode(mode)
-        self.set_nind(nind)
-        self.set_owner(owner)
-        self.set_group(group)
+    def __init__(self, type="", size=0, date="", time="", name=""):
+        self.set_type(type)
         self.set_size(size)
         self.set_date(date)
         self.set_time(time)
         self.set_name(name)
 
-    def __getattr__(self, attr):
-        if attr[:4] == "set_":
-            attr = attr[4:]
-            if attr in FILE_NODE_ATTR_LIST:
-                ind = FILE_NODE_ATTR_LIST.index(attr)
-                t = env.FILE_VIEW_COLUMN_TYPE_CONFIG[ind]
-                return lambda x: setattr(self, attr, t(x))
-        elif attr[:4] == "get_":
-            attr = attr[4:]
-            if attr in FILE_NODE_ATTR_LIST:
-                return lambda: getattr(self, attr)
-        else:
-            raise AttributeError("No such attribute" + attr)
+    def set_type(self, t):
+        self.type = t
+
+    def get_type(self):
+        return self.type
+
+    def set_size(self, s):
+        self.size = int(s)
+
+    def get_size(self):
+        return self.size
+
+    def set_date(self, d):
+        self.date = d
+
+    def get_date(self):
+        return self.date
+
+    def set_time(self, t):
+        self.time = t
+
+    def get_time(self):
+        return self.time
+
+    def set_name(self, n):
+        self.name = n
+
+    def get_name(self):
+        return self.name
 
     def to_list(self):
-        return [getattr(self,x) for x in FILE_NODE_ATTR_LIST]
+        stock = None
+        if self.get_type() == FILE_TYPE_DIR:
+            stock = gtk.STOCK_DIRECTORY
+        elif self.get_type() == FILE_TYPE_FILE:
+            stock = gtk.STOCK_FILE
+        elif self.get_type() == FILE_TYPE_LINK:
+            stock = gtk.STOCK_DND
+
+        return [stock, self.get_name(), str(self.get_size()), self.get_date(), self.get_time()]

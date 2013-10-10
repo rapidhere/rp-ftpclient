@@ -64,7 +64,7 @@ class FTP(gobject.GObject):
         self.set_transfer_mode(FTP_DEFAULT_CONNECT_MODE)
 
     @_response_function
-    def connect(self, host, port=21, timeout=FTP_DEFAULT_CONNECT_TIMEOUT):
+    def connect_to_host(self, host, port=21, timeout=FTP_DEFAULT_CONNECT_TIMEOUT):
         # Connect to specified host, port
         self._sock = socket.create_connection((host, port), timeout)
         self._sock_file = self._sock.makefile("rb")
@@ -77,6 +77,7 @@ class FTP(gobject.GObject):
             else:
                 for par in cmd_pars:
                     cmd += " " + par
+        self.emit("rf-ftp-send-cmd", cmd)
         buf = cmd + CRLF
         self._sock.sendall(buf)
 
@@ -89,15 +90,20 @@ class FTP(gobject.GObject):
     def set_data_transmission_mode(self, mode=FTP_DATA_TRANSMISSION_MODE_STREAM):
         self.send_cmd("MODE", mode)
 
-    def login(self, username='anonymous', password='', account=''):
+    def login(self, username='', password='', account=''):
+        if not username:
+            username = 'anonymous'
+
         resp = self.send_cmd("USER", username)
 
         if resp.get_resp_code() == 331:
             resp = self.send_cmd("PASS", password)
         if resp.get_resp_code() == 332:
             resp = self.send_cmd("ACCT", account)
-        if resp.get_resp_code() == 230:
+        if resp.get_resp_code() != 230:
             raise exp.FTPRuntimeException(resp)
+
+        self.login_flag = True
 
     def set_transfer_mode(self, md):
         self._transfer_mode = md
@@ -161,6 +167,13 @@ class FTP(gobject.GObject):
         resp = self.send_cmd("PWD")
         return resp.get_resp_text()[1:-1]
 
+    @_require_data_connection_function
+    def list_dir(self, dir):
+        self.send_cmd("LIST", dir)
+        buf = self._get_all_line(self._data_file)
+        self._process_response()
+        return buf
+
     def change_dir(self, path_name):
         self.send_cmd("CWD", path_name)
 
@@ -173,8 +186,16 @@ class FTP(gobject.GObject):
         self._sock = self._sock_file = None
 
     def quit(self):
-        resp = self.send_cmd("QUIT")
+        self.send_cmd("QUIT")
         self.close()
+
+    def change_parent_dir(self):
+        self.send_cmd("CDUP")
+
+    def is_login(self):
+        if not hasattr(self, "login_flag"):
+            return False
+        return self.login_flag
 
     def _get_line(self, _file):
         buf = _file.readline()
@@ -225,8 +246,7 @@ class FTP(gobject.GObject):
                 # omitted
                 pass
         finally:
-            pass
-            #self.emit("rf-ftp-response", (resp_code, resp_text))
+            self.emit("rf-ftp-response", resp_code, resp_text)
 
         return resp
 
@@ -235,4 +255,11 @@ SIGNAL_FTP_RESPONSE = gobject.signal_new(
     FTP, gobject.SIGNAL_RUN_LAST,
     gobject.TYPE_BOOLEAN,
     (gobject.TYPE_INT, gobject.TYPE_STRING)
+)
+
+SIGNAL_FTP_SEND_CMD = gobject.signal_new(
+    "rf-ftp-send-cmd",
+    FTP, gobject.SIGNAL_RUN_LAST,
+    gobject.TYPE_BOOLEAN,
+    (gobject.TYPE_STRING,)
 )

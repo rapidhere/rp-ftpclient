@@ -4,23 +4,31 @@ import pygtk
 pygtk.require("2.0")
 import gtk
 
-from bin.widget import FileNode
+from bin.widget.filenode import FileNode, FILE_TYPE_FILE, FILE_TYPE_LINK, FILE_TYPE_DIR
+from bin.net.ftpparse import parse_line
+import datetime
 
 
 def filenode_new_from_line(str_line):
     fn = FileNode()
-    buf = []
-    for item in str_line.split(" "):
-        if item:
-            buf.append(item)
+    ret = parse_line(str_line)
+    fn.set_name(ret["name"])
+    fn.set_size(ret["size"])
 
-    fn.set_mode(buf[0])
-    fn.set_nind(buf[1])
-    fn.set_owner(buf[2])
-    fn.set_group(buf[3])
-    fn.set_size(buf[4])
-    fn.set_size(buf[5] + buf[6])
-    fn.set_time(buf[7])
-    fn.set_name(buf[8])
+    time = ret["time"]
+    if not time:
+        fn.set_date(None)
+        fn.set_time(None)
+    else:
+        dt = datetime.datetime.fromtimestamp(int(time))
+        fn.set_date(dt.date().isoformat())
+        fn.set_time(dt.time().isoformat())
+
+    if ret["type"] == 'l':
+        fn.set_type(FILE_TYPE_LINK)
+    elif ret["type"] == 'f':
+        fn.set_type(FILE_TYPE_FILE)
+    elif ret["type"] == 'd':
+        fn.set_type(FILE_TYPE_DIR)
 
     return fn
