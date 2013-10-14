@@ -8,6 +8,7 @@ import gobject
 
 from bin.utils.decs import scrollable_widget
 from bin.widget import get_directory_tree, tree_dir_path_to_string, tree_dir_string_to_path, FILE_TYPE_DIR
+from utils import *
 
 
 @scrollable_widget
@@ -15,21 +16,22 @@ class DirectoryView(gtk.TreeView):
     def __init__(self):
         gtk.TreeView.__init__(self)
 
-        gobject.signal_new(
-            "rf-dir-view-expand-node",
-            self.__class__, gobject.SIGNAL_RUN_LAST,
-            gobject.TYPE_BOOLEAN,
-            (gobject.TYPE_STRING,)
-        )
-
         tv_model = DirectoryViewModel()
         self.set_model(tv_model)
 
-        tv = gtk.TreeViewColumn("Directory Tree", gtk.CellRendererText(), text=0)
+        tv = gtk.TreeViewColumn("Directory Tree")
+        pb = gtk.CellRendererPixbuf()
+        tv.pack_start(pb, False)
+        tv.set_attributes(pb, stock_id=1)
+
+        tx = gtk.CellRendererText()
+        tv.pack_start(tx, True)
+        tv.set_attributes(tx, text=0)
+
         tv.set_min_width(200)
         self.append_column(tv)
 
-        self._current_dir = None
+        self._current_path = None
 
         self.set_enable_tree_lines(True)
         self.set_rules_hint(True)
@@ -37,20 +39,20 @@ class DirectoryView(gtk.TreeView):
         self.show_all()
 
         dir_tree = get_directory_tree()
-        dir_tree.connect("rf-directory-tree-add-node", self._on_dt_add_node)
-        dir_tree.connect("rf-directory-tree-remove-node", self._on_dt_remove_node)
-        dir_tree.connect("rf-directory-tree-change-node", self._on_dt_change_node)
-        dir_tree.connect("rf-directory-tree-current-node-changed", self._on_dt_curnode_changed)
-
-        tv_model.connect("rf-dvmodel-expand-iter", self._on_dvmodel_expand_node)
+        self.handler_id = {
+            "add": dir_tree.connect("rf-directory-tree-add-node", self._on_dt_add_node),
+            "remove": dir_tree.connect("rf-directory-tree-remove-node", self._on_dt_remove_node),
+            "change": dir_tree.connect("rf-directory-tree-change-node", self._on_dt_change_node),
+            "cur_changed": dir_tree.connect("rf-directory-tree-current-node-changed", self._on_dt_curnode_changed),
+        }
 
     def _on_dt_add_node(self, widget, path):
         path = tree_dir_string_to_path(path)
 
         fn = get_directory_tree().get_node(path).get_filenode()
         if fn.get_type() == FILE_TYPE_DIR:
-            print "##" + fn.get_name()
             model = self.get_model()
+            path = common_path_to_dir_path(path)
             model.row_inserted(path, model.get_iter(path))
 
     def _on_dt_remove_node(self, widget, path):
@@ -60,14 +62,58 @@ class DirectoryView(gtk.TreeView):
         pass
 
     def _on_dt_curnode_changed(self, widget, path):
-        pass
+        path = tree_dir_string_to_path(path)
+        node = get_directory_tree().get_node(path)
+        if node.get_filenode().get_type() != FILE_TYPE_DIR:
+            return
 
-    def _on_dvmodel_expand_node(self, widget, path):
-        return self.emit("rf-dir-view-expand-node", path)
+        path = common_path_to_dir_path(path)
+        if path == self._current_path:
+            return False
+
+        self._current_path = path
+        self.expand_to_path(path)
+        self.expand_row(path, False)
+        self.set_cursor_on_cell(path)
+
+gobject.signal_new(
+    "rf-dir-view-expand-node",
+    DirectoryView, gobject.SIGNAL_RUN_LAST,
+    gobject.TYPE_BOOLEAN,
+    (gobject.TYPE_STRING,)
+)
+
+gobject.signal_new(
+    "rf-dir-view-activate",
+    DirectoryView, gobject.SIGNAL_RUN_LAST,
+    gobject.TYPE_BOOLEAN,
+    (gobject.TYPE_STRING,)
+)
+
+_directory_view_instance = None
+
+
+def get_directory_view():
+    global _directory_view_instance
+    if not _directory_view_instance:
+        _directory_view_instance = DirectoryView()
+
+        def _on_dvmodel_expand_node(widget, path):
+            _directory_view_instance.emit("rf-dir-view-expand-node", path)
+
+        _directory_view_instance.get_model().connect("rf-dvmodel-expand-iter", _on_dvmodel_expand_node)
+
+        def _on_row_activated(widget, path, column):
+            c_path = dir_path_to_common_path(path)
+            _directory_view_instance.emit("rf-dir-view-activate", tree_dir_path_to_string(c_path))
+
+        _directory_view_instance._inner.connect("row-activated", _on_row_activated)
+
+    return _directory_view_instance
 
 
 class DirectoryViewModel(gtk.GenericTreeModel):
-    column_type = (str,)
+    column_type = (str, str)
 
     def __init__(self):
         gtk.GenericTreeModel.__init__(self)
@@ -82,57 +128,79 @@ class DirectoryViewModel(gtk.GenericTreeModel):
         return self.column_type[index]
 
     def on_get_iter(self, path):
-        # ret = get_directory_tree().get_root()
-        # for ind in path:
-        #     if len(ret.get_n_children()) == 0:
-        #         self.emit("rf-dvmodel-expand-iter", tree_dir_path_to_string(ret.get_path_tuple()))
-        #     ret = ret.get_nth_child(ind)
-        # return ret
         try:
-            return get_directory_tree().get_node(path)
+            ret = get_directory_tree()._root
+            for ind in path:
+                ret = get_nth_dir_child(ret, ind)
+            return ret
         except IndexError:
             return None
 
     def on_get_path(self, iter):
-        return iter.get_path_tuple()
+        ret = []
+        while iter.get_parent():
+            ind = self.index_dir_child(iter)
+            iter = iter.get_parent()
+            ret = [ind] + ret
+        return ret
 
     def on_get_value(self, iter, column):
         if column == 0:
             return iter.get_filenode().get_name()
+        elif column == 1:
+            return gtk.STOCK_DIRECTORY
 
     def on_iter_next(self, iter):
         try:
-            parent = iter.get_parent()
-            index = parent.index_child(iter) + 1
-            return parent.get_nth_child(index)
+            index = index_dir_child(iter) + 1
+            return get_nth_dir_child(iter.get_parent(), index)
         except IndexError:
             return None
 
     def on_iter_children(self, iter):
         if not iter:
-            return get_directory_tree().get_root()
+            return get_directory_tree()._root
 
         if not iter.is_expanded():
             self.emit("rf-dvmodel-expand-iter", tree_dir_path_to_string(iter.get_path_tuple()))
-        return iter.get_nth_child(0)
+        return get_nth_dir_child(iter, 0)
 
     def on_iter_has_child(self, iter):
+        if not iter:
+            iter = get_directory_tree()._root
+
         if not iter.is_expanded():
             self.emit("rf-dvmodel-expand-iter", tree_dir_path_to_string(iter.get_path_tuple()))
-        return iter.get_n_children() != 0
+        cnt = 0
+        for ch in iter.get_child_list():
+            if ch.get_filenode().get_type() == FILE_TYPE_DIR:
+                cnt += 1
+        return cnt != 0
 
     def on_iter_n_children(self, iter):
+        if not iter:
+            iter = get_directory_tree()._root
+
         if not iter.is_expanded():
             self.emit("rf-dvmodel-expand-iter", tree_dir_path_to_string(iter.get_path_tuple()))
-        return iter.get_n_children()
+
+        cnt = 0
+        for ch in iter.get_child_list():
+            if ch.get_filenode().get_type() == FILE_TYPE_DIR:
+                cnt += 1
+        return cnt
 
     def on_iter_nth_child(self, iter, index):
         if not iter:
-            return get_directory_tree().get_root().get_nth_child(index)
+            iter = get_directory_tree()._root
 
         if not iter.is_expanded():
             self.emit("rf-dvmodel-expand-iter", tree_dir_path_to_string(iter.get_path_tuple()))
-        return iter.get_nth_child(index)
+
+        try:
+            return get_nth_dir_child(iter, index)
+        except IndexError:
+            return None
 
     def on_iter_parent(self, iter):
         return iter.get_parent()

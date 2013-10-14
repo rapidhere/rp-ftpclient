@@ -104,4 +104,5 @@ class DirectoryTreeNode(gobject.GObject):
             if nd.get_filenode().get_name() == node.get_filenode().get_name():
                 return index
 
+            index += 1
         return -1

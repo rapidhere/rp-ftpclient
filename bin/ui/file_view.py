@@ -4,11 +4,12 @@
 import pygtk
 pygtk.require("2.0")
 import gtk
+import gobject
 
 from bin import env
 from bin.utils.decs import scrollable_widget
-from bin.widget import get_directory_tree
-from bin.widget import tree_dir_string_to_path
+from bin.widget import get_directory_tree, FILE_TYPE_DIR, FILE_TYPE_FILE
+from bin.widget import tree_dir_string_to_path, tree_dir_path_to_string
 
 
 @scrollable_widget
@@ -71,12 +72,16 @@ class FileView(gtk.TreeView):
         dir_tree = get_directory_tree()
         cur_node = dir_tree.get_node(path)
 
-        model = self.get_model()
-        model.clear()
+        file_type = cur_node.get_filenode().get_type()
+        if file_type == FILE_TYPE_DIR:
+            model = self.get_model()
+            model.clear()
 
-        for ind in range(0, cur_node.get_n_children()):
-            fn = cur_node.get_nth_child(ind).get_filenode()
-            model.append(fn.to_list())
+            for ind in range(0, cur_node.get_n_children()):
+                fn = cur_node.get_nth_child(ind).get_filenode()
+                model.append(fn.to_list())
+        elif file_type == FILE_TYPE_FILE:
+            pass
 
     def _set_up_columns(self):
         # name(icon, string)      size        date        time
@@ -114,3 +119,29 @@ class FileView(gtk.TreeView):
 
         tv.set_min_width(50)
         self.append_column(tv)
+
+gobject.signal_new(
+    "rf-file-view-activate",
+    FileView, gobject.SIGNAL_RUN_LAST,
+    gobject.TYPE_BOOLEAN,
+    (gobject.TYPE_STRING,)
+)
+
+
+_file_view_instance = None
+
+
+def get_file_view():
+    global _file_view_instance
+    if not _file_view_instance:
+        _file_view_instance = FileView()
+
+        def _on_row_activate(widget, path, column):
+            path = tuple(list(get_directory_tree().get_cur_node().get_path_tuple()) + list(path))
+            node = get_directory_tree().get_node(path)
+            if node.get_filenode().get_type() == FILE_TYPE_DIR:
+                _file_view_instance.emit("rf-file-view-activate", tree_dir_path_to_string(path))
+
+        _file_view_instance._inner.connect("row-activated", _on_row_activate)
+
+    return _file_view_instance

@@ -6,7 +6,7 @@ pygtk.require("2.0")
 import gtk
 import gobject
 
-from bin.ui import Window, MenuBar, FileView, ResponseView, DirectoryView
+from bin.ui import Window, MenuBar, get_file_view, ResponseView, get_directory_view
 from bin.ui.dialogs import BaseConnectDialog, BASE_CONNECT_DIA_BT_CONNECT, BASE_CONNECT_DIA_BT_CANCEL
 from bin import env
 from bin.net import FTP, FTPResponse
@@ -32,7 +32,9 @@ class RFApp(gobject.GObject):
         self.win.connect("destroy", lambda w: self.exit())
         self.ftp.connect("rf-ftp-response", self._on_ftp_response)
         self.ftp.connect("rf-ftp-send-cmd", self._on_ftp_send_cmd)
-        self.directory_view._inner.connect("rf-dir-view-expand-node", self._on_directory_view_expand_node)
+        self.directory_view.connect("rf-dir-view-expand-node", self._on_directory_view_expand_node)
+        self.directory_view.connect("rf-dir-view-activate", self._on_directory_view_activate)
+        self.file_view.connect("rf-file-view-activate", self._on_file_view_activate)
 
         self.win.show()
 
@@ -89,10 +91,10 @@ class RFApp(gobject.GObject):
         self.menubar = MenuBar(MENU_BAR_CONF)
 
     def _load_up_directory_view(self):
-        self.directory_view = DirectoryView()
+        self.directory_view = get_directory_view()
 
     def _load_up_file_view(self):
-        self.file_view = FileView()
+        self.file_view = get_file_view()
 
     def _load_up_resp_bar(self):
         self.resp_bar = ResponseView()
@@ -169,11 +171,11 @@ class RFApp(gobject.GObject):
     def _on_directory_view_expand_node(self, widget, path):
         path = tree_dir_string_to_path(path)
         node = self.dir_tree.get_node(path)
+        self._expand_node(node)
 
-        print "#" + str(path)
-        print "#" + str(node.get_filenode().get_name())
-        print "#"
+        return True
 
+    def _expand_node(self, node):
         dir_tuple = node.get_dir_tuple()
         node.set_expanded()
         for line in self.ftp.list_dir("/".join(dir_tuple)).split("\n"):
@@ -182,7 +184,20 @@ class RFApp(gobject.GObject):
             fn = filenode_new_from_line(line)
             self.dir_tree.append_child_fn(fn, node=node)
 
-        return True
+    def _on_directory_view_activate(self, widget, path):
+        path = tree_dir_string_to_path(path)
+        node = self.dir_tree.get_node(path)
+
+        self.dir_tree.set_cur_node(node)
+
+    def _on_file_view_activate(self, widget, path):
+        path = tree_dir_string_to_path(path)
+        node = self.dir_tree.get_node(path)
+
+        if not node.is_expanded():
+            self._expand_node(node)
+
+        self.dir_tree.set_cur_node(node)
 
     def _on_menubar_advanced_connect(self, widget, data=None):
         pass
