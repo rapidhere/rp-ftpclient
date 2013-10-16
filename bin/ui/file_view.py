@@ -28,6 +28,14 @@ class FileView(gtk.TreeView):
         dir_tree.connect("rf-directory-tree-change-node", self._on_dt_change_node)
         dir_tree.connect("rf-directory-tree-current-node-changed", self._on_dt_curnode_changed)
 
+        self.connect("row-activated", self._on_row_activate)
+
+    def _on_row_activate(self, widget, path, column):
+        path = tuple(list(get_directory_tree().get_cur_node().get_path_tuple()) + list(path))
+        node = get_directory_tree().get_node(path)
+        if node.get_filenode().get_type() == FILE_TYPE_DIR:
+            get_directory_tree().set_cur_node(node)
+
     def _on_dt_add_node(self, widget, path):
         path = tree_dir_string_to_path(path)
         dir_tree = get_directory_tree()
@@ -120,14 +128,6 @@ class FileView(gtk.TreeView):
         tv.set_min_width(50)
         self.append_column(tv)
 
-gobject.signal_new(
-    "rf-file-view-activate",
-    FileView, gobject.SIGNAL_RUN_LAST,
-    gobject.TYPE_BOOLEAN,
-    (gobject.TYPE_STRING,)
-)
-
-
 _file_view_instance = None
 
 
@@ -135,13 +135,5 @@ def get_file_view():
     global _file_view_instance
     if not _file_view_instance:
         _file_view_instance = FileView()
-
-        def _on_row_activate(widget, path, column):
-            path = tuple(list(get_directory_tree().get_cur_node().get_path_tuple()) + list(path))
-            node = get_directory_tree().get_node(path)
-            if node.get_filenode().get_type() == FILE_TYPE_DIR:
-                _file_view_instance.emit("rf-file-view-activate", tree_dir_path_to_string(path))
-
-        _file_view_instance._inner.connect("row-activated", _on_row_activate)
 
     return _file_view_instance

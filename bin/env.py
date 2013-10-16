@@ -2,10 +2,9 @@
 # -*- coding:utf-8 -*-
 import pygtk
 pygtk.require("2.0")
-import gtk
 
 # Window Settings
-DEFAULT_WIN_SIZE = (800, 500)
+DEFAULT_WIN_SIZE = (800, 520)
 WIN_TITLE = "rp-ftp-client"
 
 # Menu bar Settings
@@ -29,3 +28,22 @@ RESP_VIEW_SEND_CMD_FONT_COLOR = "#10FF10"
 RESP_VIEW_SERVER_RESP_FONT_COLOR = "#FF10FF"
 
 RESP_VIEW_MAX_LINE = 100
+
+# Console View Settings
+CONSOLE_VIEW_BGCOLOR = "#101010"
+CONSOLE_VIEW_FGCOLOR_NORMAL = "#F0F0F0"
+CONSOLE_VIEW_FONT = "Consolas 12"
+CONSOLE_VIEW_PROMPT = ">>> "
+CONSOLE_VIEW_MAX_LINE = 200
+
+# Command goes here
+CMD_LIST = (
+    ("quit",()),
+    ("ls", ()),
+    ("cd", ("dir:require",)),
+    ("cdup", ()),
+    ("connect", ("host:require", "port:int")),
+    ("login", ("usr", "psw", "act")),
+    ("pwd", ()),
+    ("clear", ()),
+)

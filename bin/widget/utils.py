@@ -7,6 +7,10 @@ from bin.net.ftpparse import parse_line
 import datetime
 
 
+def dir_tuple_to_path(t):
+    return "/".join(t)
+
+
 def tree_dir_path_to_string(path_tuple):
     return "\n".join([repr(x) for x in path_tuple])
 

@@ -5,9 +5,12 @@ import pygtk
 pygtk.require("2.0")
 import gobject
 
-from utils import tree_dir_path_to_string
+from utils import tree_dir_path_to_string, dir_tuple_to_path, filenode_new_from_line
 from decs import std_path_notify_function
 from directory_tree_node import DirectoryTreeNode
+from bin.net import get_ftp
+from bin import exp
+from filenode import FILE_TYPE_DIR
 
 
 class DirectoryTree(gobject.GObject):
@@ -18,6 +21,8 @@ class DirectoryTree(gobject.GObject):
 
     def set_cur_node(self, node):
         self.cur_node = node
+        get_ftp().change_dir(dir_tuple_to_path(node.get_dir_tuple()))
+
         self.emit("rf-directory-tree-current-node-changed",
                   tree_dir_path_to_string(node.get_path_tuple()))
 
@@ -25,15 +30,23 @@ class DirectoryTree(gobject.GObject):
         return self.cur_node
 
     def set_root(self, root_fn):
-        root = DirectoryTreeNode(root_fn, self._root)
-        self._root.child_list = [root]
-        self.set_cur_node(root)
-
         if self._root.get_n_children():
             self.emit("rf-directory-tree-remove-node", tree_dir_path_to_string(
                 self._root.get_nth_child(0).get_path_tuple()
             ))
+
+        root = DirectoryTreeNode(root_fn, self._root)
+        self._root.child_list = [root]
+        self.set_cur_node(root)
+
         self.emit("rf-directory-tree-add-node", tree_dir_path_to_string(root.get_path_tuple()))
+
+        self.get_cur_node().set_expanded()
+        for line in get_ftp().list_current_dir().split("\n"):
+            if not line:
+                continue
+            fn = filenode_new_from_line(line)
+            self.append_child_fn(fn)
 
     def get_root(self):
         return self._root.get_nth_child(0)
@@ -44,6 +57,33 @@ class DirectoryTree(gobject.GObject):
             ret = ret.get_nth_child(ind)
 
         return ret
+
+    def expand_node(self, node):
+        dir_tuple = node.get_dir_tuple()
+        node.set_expanded()
+
+        import os
+        path = os.path.join(*dir_tuple)
+        for line in get_ftp().list_dir(path).split("\n"):
+            if not line:
+                continue
+            fn = filenode_new_from_line(line)
+            self.append_child_fn(fn, node=node)
+
+    def change_into_child(self, dir_name):
+        for ch in self.cur_node.get_child_list():
+            if ch.get_filenode().get_name() == dir_name and ch.get_filenode().get_type() == FILE_TYPE_DIR:
+                self.set_cur_node(ch)
+                return
+
+        raise exp.DirectoryTreeChangeIntoChildFailed(dir_name)
+
+    def change_into_parent(self):
+        if self.cur_node.get_parent().get_parent():
+            self.set_cur_node(self.cur_node.get_parent())
+            return
+
+        raise exp.DirectoryTreeChangeIntoParentFailed()
 
     def is_under_current_dir(self, node):
         if self.cur_node.index_child(node) == -1:

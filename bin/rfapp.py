@@ -6,22 +6,25 @@ pygtk.require("2.0")
 import gtk
 import gobject
 
-from bin.ui import Window, MenuBar, get_file_view, ResponseView, get_directory_view
+from bin.ui import get_window, MenuBar, get_file_view, get_response_view, get_directory_view, get_console_view
 from bin.ui.dialogs import BaseConnectDialog, BASE_CONNECT_DIA_BT_CONNECT, BASE_CONNECT_DIA_BT_CANCEL
 from bin import env
-from bin.net import FTP, FTPResponse
-from bin.widget import FileNode, get_directory_tree, filenode_new_from_line, tree_dir_string_to_path, FILE_TYPE_DIR
+from bin.net import get_ftp, FTPResponse
+from bin.widget import FileNode, get_directory_tree, filenode_new_from_line, \
+    FILE_TYPE_DIR
+import exp
 
 
 class RFApp(gobject.GObject):
     def __init__(self):
         gobject.GObject.__init__(self)
-        self.ftp = FTP()
+        self.ftp = get_ftp()
 
-        self.win = Window(self)
+        self.win = get_window()
         self._load_up_menubar()
         self._load_up_file_view()
         self._load_up_directory_view()
+        self._load_up_console_view()
         self._load_up_resp_bar()
 
         self._set_up_layout()
@@ -32,9 +35,6 @@ class RFApp(gobject.GObject):
         self.win.connect("destroy", lambda w: self.exit())
         self.ftp.connect("rf-ftp-response", self._on_ftp_response)
         self.ftp.connect("rf-ftp-send-cmd", self._on_ftp_send_cmd)
-        self.directory_view.connect("rf-dir-view-expand-node", self._on_directory_view_expand_node)
-        self.directory_view.connect("rf-dir-view-activate", self._on_directory_view_activate)
-        self.file_view.connect("rf-file-view-activate", self._on_file_view_activate)
 
         self.win.show()
 
@@ -48,15 +48,21 @@ class RFApp(gobject.GObject):
 
         # { Global Pane
         paned = gtk.VPaned()
-        ## { Pane1 on the top
+        ## { Pane on the top
         paned1 = gtk.HPaned()
         paned1.add1(self.file_view)
         paned1.add2(self.directory_view)
         paned1.show()
         paned.add1(paned1)
-        ## }
-        paned.add2(self.resp_bar)
+        ## } { Page on the bottom
+        notebook = gtk.Notebook()
+        notebook.set_tab_pos(gtk.POS_TOP)
+        notebook.append_page(self.resp_bar, gtk.Label("Response"))
+        notebook.append_page(self.console_view, gtk.Label("Console"))
+        notebook.show_all()
+        paned.add2(notebook)
         paned.show()
+        ## }
         vbox.pack_start(paned, True, True)
         # }
 
@@ -97,9 +103,11 @@ class RFApp(gobject.GObject):
         self.file_view = get_file_view()
 
     def _load_up_resp_bar(self):
-        self.resp_bar = ResponseView()
-
+        self.resp_bar = get_response_view()
         self.resp_bar.append_info_line(env.RESP_VIEW_WELCOME_INFO)
+
+    def _load_up_console_view(self):
+        self.console_view = get_console_view()
 
     def _new_connection(self, host, usr, psw,
                         port=None,
@@ -108,7 +116,6 @@ class RFApp(gobject.GObject):
                         data_structure=None,
                         trans_mode=None,
                         connect_mode=None):
-        self.resp_bar.append_info_line("Connecting ..")
         if port:
             self.ftp.connect_to_host(host, port)
         else:
@@ -130,28 +137,22 @@ class RFApp(gobject.GObject):
             self.resp_bar.append_info_line("Configuring connect mode ...")
             self.ftp.set_transfer_mode(connect_mode)
 
-        self.resp_bar.append_info_line("Login ...")
         self.ftp.login(usr, psw, acct)
-
-        self.resp_bar.append_info_line("Retrieving directory ..")
 
         root_dir = self.ftp.print_current_dir()
         root_fn = FileNode(name=root_dir, type=FILE_TYPE_DIR)
         self.dir_tree.set_root(root_fn)
-
-        self.dir_tree.get_cur_node().set_expanded()
-        for line in self.ftp.list_current_dir().split("\n"):
-            if not line:
-                continue
-            fn = filenode_new_from_line(line)
-            self.dir_tree.append_child_fn(fn)
 
     def _on_menubar_base_connect(self, widget, data=None):
         dia = BaseConnectDialog(self.win)
         resp = dia.run()
 
         if resp.resp_id == BASE_CONNECT_DIA_BT_CONNECT:
-            self._new_connection(resp.hst, resp.usr, resp.pss, resp.prt)
+            try:
+                self._new_connection(resp.hst, resp.usr, resp.pss, resp.prt)
+            except (exp.FTPConnectFailed, exp.FTPMakePortFailed) as e:
+                self.resp_bar.append_error_line(str(e))
+                self.ftp.close()
         elif resp.resp_id == BASE_CONNECT_DIA_BT_CANCEL:
             pass
 
@@ -167,37 +168,6 @@ class RFApp(gobject.GObject):
 
     def _on_ftp_send_cmd(self, widget, cmd):
         self.resp_bar.append_send_cmd_info(cmd)
-
-    def _on_directory_view_expand_node(self, widget, path):
-        path = tree_dir_string_to_path(path)
-        node = self.dir_tree.get_node(path)
-        self._expand_node(node)
-
-        return True
-
-    def _expand_node(self, node):
-        dir_tuple = node.get_dir_tuple()
-        node.set_expanded()
-        for line in self.ftp.list_dir("/".join(dir_tuple)).split("\n"):
-            if not line:
-                continue
-            fn = filenode_new_from_line(line)
-            self.dir_tree.append_child_fn(fn, node=node)
-
-    def _on_directory_view_activate(self, widget, path):
-        path = tree_dir_string_to_path(path)
-        node = self.dir_tree.get_node(path)
-
-        self.dir_tree.set_cur_node(node)
-
-    def _on_file_view_activate(self, widget, path):
-        path = tree_dir_string_to_path(path)
-        node = self.dir_tree.get_node(path)
-
-        if not node.is_expanded():
-            self._expand_node(node)
-
-        self.dir_tree.set_cur_node(node)
 
     def _on_menubar_advanced_connect(self, widget, data=None):
         pass

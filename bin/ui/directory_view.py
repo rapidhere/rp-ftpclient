@@ -31,8 +31,6 @@ class DirectoryView(gtk.TreeView):
         tv.set_min_width(200)
         self.append_column(tv)
 
-        self._current_path = None
-
         self.set_enable_tree_lines(True)
         self.set_rules_hint(True)
 
@@ -45,6 +43,13 @@ class DirectoryView(gtk.TreeView):
             "change": dir_tree.connect("rf-directory-tree-change-node", self._on_dt_change_node),
             "cur_changed": dir_tree.connect("rf-directory-tree-current-node-changed", self._on_dt_curnode_changed),
         }
+
+        self.connect("row-activated", self._on_row_activated)
+
+    def _on_row_activated(self, widget, path, column):
+        c_path = dir_path_to_common_path(path)
+        dir_tree = get_directory_tree()
+        get_directory_tree().set_cur_node(dir_tree.get_node(c_path))
 
     def _on_dt_add_node(self, widget, path):
         path = tree_dir_string_to_path(path)
@@ -68,27 +73,11 @@ class DirectoryView(gtk.TreeView):
             return
 
         path = common_path_to_dir_path(path)
-        if path == self._current_path:
-            return False
 
         self._current_path = path
         self.expand_to_path(path)
         self.expand_row(path, False)
         self.set_cursor_on_cell(path)
-
-gobject.signal_new(
-    "rf-dir-view-expand-node",
-    DirectoryView, gobject.SIGNAL_RUN_LAST,
-    gobject.TYPE_BOOLEAN,
-    (gobject.TYPE_STRING,)
-)
-
-gobject.signal_new(
-    "rf-dir-view-activate",
-    DirectoryView, gobject.SIGNAL_RUN_LAST,
-    gobject.TYPE_BOOLEAN,
-    (gobject.TYPE_STRING,)
-)
 
 _directory_view_instance = None
 
@@ -97,17 +86,6 @@ def get_directory_view():
     global _directory_view_instance
     if not _directory_view_instance:
         _directory_view_instance = DirectoryView()
-
-        def _on_dvmodel_expand_node(widget, path):
-            _directory_view_instance.emit("rf-dir-view-expand-node", path)
-
-        _directory_view_instance.get_model().connect("rf-dvmodel-expand-iter", _on_dvmodel_expand_node)
-
-        def _on_row_activated(widget, path, column):
-            c_path = dir_path_to_common_path(path)
-            _directory_view_instance.emit("rf-dir-view-activate", tree_dir_path_to_string(c_path))
-
-        _directory_view_instance._inner.connect("row-activated", _on_row_activated)
 
     return _directory_view_instance
 
@@ -162,7 +140,7 @@ class DirectoryViewModel(gtk.GenericTreeModel):
             return get_directory_tree()._root
 
         if not iter.is_expanded():
-            self.emit("rf-dvmodel-expand-iter", tree_dir_path_to_string(iter.get_path_tuple()))
+            get_directory_tree().expand_node(iter)
         return get_nth_dir_child(iter, 0)
 
     def on_iter_has_child(self, iter):
@@ -170,7 +148,7 @@ class DirectoryViewModel(gtk.GenericTreeModel):
             iter = get_directory_tree()._root
 
         if not iter.is_expanded():
-            self.emit("rf-dvmodel-expand-iter", tree_dir_path_to_string(iter.get_path_tuple()))
+            get_directory_tree().expand_node(iter)
         cnt = 0
         for ch in iter.get_child_list():
             if ch.get_filenode().get_type() == FILE_TYPE_DIR:
@@ -182,7 +160,7 @@ class DirectoryViewModel(gtk.GenericTreeModel):
             iter = get_directory_tree()._root
 
         if not iter.is_expanded():
-            self.emit("rf-dvmodel-expand-iter", tree_dir_path_to_string(iter.get_path_tuple()))
+            get_directory_tree().expand_node(iter)
 
         cnt = 0
         for ch in iter.get_child_list():
@@ -195,7 +173,7 @@ class DirectoryViewModel(gtk.GenericTreeModel):
             iter = get_directory_tree()._root
 
         if not iter.is_expanded():
-            self.emit("rf-dvmodel-expand-iter", tree_dir_path_to_string(iter.get_path_tuple()))
+            get_directory_tree().expand_node(iter)
 
         try:
             return get_nth_dir_child(iter, index)
@@ -204,10 +182,3 @@ class DirectoryViewModel(gtk.GenericTreeModel):
 
     def on_iter_parent(self, iter):
         return iter.get_parent()
-
-gobject.signal_new(
-    "rf-dvmodel-expand-iter",
-    DirectoryViewModel, gobject.SIGNAL_RUN_LAST,
-    gobject.TYPE_BOOLEAN,
-    (gobject.TYPE_STRING, )
-)

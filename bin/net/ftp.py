@@ -24,8 +24,11 @@ class FTP(gobject.GObject):
     @decs._response_function
     def connect_to_host(self, host, port=21, timeout=FTP_DEFAULT_CONNECT_TIMEOUT):
         # Connect to specified host, port
-        self._sock = socket.create_connection((host, port), timeout)
-        self._sock_file = self._sock.makefile("rb")
+        try:
+            self._sock = socket.create_connection((host, port), timeout)
+            self._sock_file = self._sock.makefile("rb")
+        except socket.error as se:
+            raise exp.FTPConnectFailed(host, port, str(se))
 
     @decs._response_function
     def send_cmd(self, cmd, cmd_pars=None):
@@ -221,3 +224,13 @@ SIGNAL_FTP_SEND_CMD = gobject.signal_new(
     gobject.TYPE_BOOLEAN,
     (gobject.TYPE_STRING,)
 )
+
+_global_ftp_instance = None
+
+
+def get_ftp():
+    global _global_ftp_instance
+    if not _global_ftp_instance:
+        _global_ftp_instance = FTP()
+
+    return _global_ftp_instance

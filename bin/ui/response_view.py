@@ -5,6 +5,7 @@ import pygtk
 pygtk.require("2.0")
 import gtk
 import pango
+import datetime
 
 from bin import env
 from bin.utils.decs import scrollable_widget
@@ -64,11 +65,13 @@ class ResponseView(gtk.TextView):
         self.append_error(txt)
 
     def append_send_cmd_info(self, cmd):
-        self.append("[Client] ", 1, self.tag_client)
+        t = datetime.datetime.now()
+        self.append("[Client] at %s " % t.time().strftime("%S.%f"), 1, self.tag_client)
         self.append_info_line(cmd)
 
     def append_server_resp(self, resp, tag):
-        self.append("[Server] ", 1, self.tag_server)
+        t = datetime.datetime.now()
+        self.append("[Server] at %s " % t.time().strftime("%S.%f"), 1, self.tag_server)
         self.append(repr(resp) + "\n", 0, tag)
 
     def append_server_resp_info(self, resp):
@@ -95,3 +98,7 @@ class ResponseView(gtk.TextView):
             for i in range(0, n_line):
                 iter.forward_line()
             self.text_buffer.delete(self.text_buffer.get_start_iter(), iter)
+
+
+def get_response_view():
+    return ResponseView()
